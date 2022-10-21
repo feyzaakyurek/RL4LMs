@@ -2,7 +2,7 @@ import imp
 from rl4lms.envs.text_generation.test_reward import RewardIncreasingNumbers, RewardSentencesWithDates
 from rl4lms.envs.text_generation.test_datapool import TestTextGenPool
 from rl4lms.envs.text_generation.metric import BaseMetric, LearnedRewardMetric, MeteorMetric, RougeMetric, BERTScoreMetric, BLEUMetric, BLEURTMetric, DiversityMetrics, SummaCZSMetric, SummaCConvMetric, Perplexity, CIDERMetric, SpiceMetric, ParentToTTo, BLEUToTTo, RougeLMax, SacreBLEUMetric, TERMetric, chrFmetric
-from rl4lms.data_pools.custom_text_generation_pools import IMDB, CommonGen, ToTTo, CNNDailyMail, IMDBForSeq2Seq, NarrativeQA, WMT, WMT14PreprocessedEnDe, WMT16NewsOnlyDatasetEnDe, IWSLT2017EnDe, CRD3DialogueGeneration
+from rl4lms.data_pools.custom_text_generation_pools import IMDB, CommonGen, ToTTo, CNNDailyMail, IMDBForSeq2Seq, NarrativeQA, WMT, WMT14PreprocessedEnDe, WMT16NewsOnlyDatasetEnDe, IWSLT2017EnDe, CRD3DialogueGeneration, Interscript
 from rl4lms.envs.text_generation.test_metric import IncreasingNumbersinText, DateInText
 from rl4lms.data_pools.text_generation_pool import TextGenPool
 from rl4lms.envs.text_generation.reward import RewardFunction, LearnedRewardFunction, MeteorRewardFunction, RougeRewardFunction, BERTScoreRewardFunction, BLEURewardFunction, BLEURTRewardFunction, RougeCombined, SpiderRewardFunction, CommonGenPenaltyShapingFunction, BatchedCommonGenPenaltyShapingFunction, PARENTRewardFunction, SacreBleu, RougeLMaxRewardFunction, TER, chrF
@@ -18,6 +18,7 @@ from rl4lms.algorithms.a2c.a2c import A2C
 from rl4lms.envs.text_generation.post_processors import three_sentence_summary
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
 
+from custom_reward import EditMatch
 
 class DataPoolRegistry:
     _registry = {
@@ -32,7 +33,8 @@ class DataPoolRegistry:
         "wmt14_processed_en_de": WMT14PreprocessedEnDe,
         "wmt16newsonly": WMT16NewsOnlyDatasetEnDe,
         "iwslt2017en_de": IWSLT2017EnDe,
-        "crd3": CRD3DialogueGeneration}
+        "crd3": CRD3DialogueGeneration,
+        "interscript": Interscript}
 
     @classmethod
     def get(cls, datapool_id: str, kwargs: Dict[str, Any]) -> TextGenPool:
@@ -63,7 +65,8 @@ class RewardFunctionRegistry:
         "sacre_bleu": SacreBleu,
         "rouge_l_max": RougeLMaxRewardFunction,
         "ter": TER,
-        "chrf": chrF}
+        "chrf": chrF,
+        "editmatch": EditMatch}
 
     @classmethod
     def get(cls, reward_fn_id: str, kwargs: Dict[str, Any]) -> RewardFunction:
