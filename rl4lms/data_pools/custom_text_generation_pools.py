@@ -12,6 +12,46 @@ import zipfile
 import json
 
 
+class Interscript(TextGenPool):
+    @classmethod
+    def prepare(
+        cls,
+        split: str,
+        prompt_prefix: str = "",
+        truncate_article: int = None,
+        max_size: int = None,
+    ):
+        # Read the data
+        if split == "train":
+            pth = "./data/interscript/train_n1184_target_edit_t5_largeF.json"
+        elif split == "val":
+            pth = "./data/interscript/val_n192_t5_largeF.json"
+        elif split == "test":
+            pth = "./data/interscript/val_n192_t5_largeF.json"
+        else:
+            raise ValueError("Split not supported")
+
+        data = []
+        with open(pth, "r") as f:
+            for line in f:
+                data.append(json.loads(line))
+
+        samples = []
+        for ix, item in enumerate(data):
+            sample = Sample(
+                id=f"{split}_{ix}",
+                prompt_or_input_text=prompt_prefix + item["text"],
+                references=[item["summary"]],
+            )
+            samples.append(sample)
+
+            if max_size is not None and ix == (max_size - 1):
+                break
+
+        pool_instance = cls(samples)
+        return pool_instance
+        
+
 class ToTTo(TextGenPool):
     @classmethod
     def prepare(cls, split: str,
