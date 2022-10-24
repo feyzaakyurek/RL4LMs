@@ -1,11 +1,9 @@
 import json
-import re
 import time
 from typing import Dict, List
 
-import ipdb
-import numpy as np
 import openai
+
 # import stopit
 
 from tqdm import tqdm
@@ -104,7 +102,7 @@ def get_generations_gpt3(
     penalty: float,
     n: int,
     keyfile: str,
-    top_p : float = 1.0,
+    top_p: float = 1.0,
 ) -> List[str]:
 
     openai.api_key = [el for el in open(keyfile, "r")][0][:-1]
