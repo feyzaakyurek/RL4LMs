@@ -6,6 +6,9 @@ import sys
 import pdb
 from transformers import AutoTokenizer
 import random
+import re
+
+calls = 0
 
 
 tokenizer_config = {
@@ -42,8 +45,55 @@ class ForkedPdb(pdb.Pdb):
             sys.stdin = _stdin
 
 
-def exact_match(a, b):
-    return a == b
+def custom_metric(pred, gold):
+
+    score = 0.2
+    try:
+
+        if (
+            "[INSERT]" in pred and "Insert" in gold and 
+            (
+                ("[AFTER]" in pred and "after" in gold) or
+                ("[BEFORE]" in pred and "before" in gold)
+            )
+        ):
+
+            node_insert = re.search('\[INSERT\](.*)\[AFTER\]', pred).group(1).strip()
+            node_after = re.search('\[AFTER\](.*)\[END\]', pred).group(1).strip()
+            node_insert_g = re.search("Insert node(.*)after", gold).group(1).strip()
+            node_after_g = re.search("after(.*)", gold).group(1).strip()
+
+            if node_insert == node_insert_g and node_after == node_after_g:
+                score += 0.8
+
+
+        elif "[REMOVE]" in pred and "Remove" in gold:
+
+            node_remove = re.search('\[REMOVE\](.*)\[END\]', pred).group(1).strip()
+            node_remove_g = re.search("Remove node(.*)", gold).group(1).strip()
+
+            if node_remove == node_remove_g:
+                score += 0.4
+            
+
+        elif "[REORDER]" in pred and "Reorder" in gold:
+            node_reorder1 = re.search('\[REORDER\](.*)\[AND\]', pred).group(1).strip().strip("'")
+            node_reorder2 = re.search('\[AND\](.*)\[END\]', pred).group(1).strip().strip("'")
+            
+            node_reorder1_g = re.search("Reorder edge between '<(.*),", gold).group(1).strip()
+            node_reorder2_g = re.search(",(.*) >'", gold).group(1).strip()
+
+            ss = set([node_reorder1, node_reorder1_g, node_reorder2, node_reorder2_g])
+            if len(ss) == 2:
+                score += 0.8
+            if len(ss) == 3:
+                score += 0.4
+            
+        else:
+            return 0
+    except AttributeError:
+        return 0
+    return score
 
 
 class EditMatch(RewardFunction):
@@ -51,7 +101,7 @@ class EditMatch(RewardFunction):
         super().__init__()
         self.tokenizer_config = kwargs["tokenizer"]
         self.tokenizer = build_tokenizer(self.tokenizer_config)
-        self.metric = exact_match
+        self.metric = custom_metric
         self.prompt = kwargs["prompt_path"]
         self.separator = kwargs["separator"]
 
@@ -68,11 +118,15 @@ class EditMatch(RewardFunction):
         meta_info: Dict[str, Any] = None,
     ) -> float:
 
+        global calls
+
         if done:
             # 1. goal, steps, EOS, feedback_pred = Decode current_observation.input_encoded_pt
             # 2. edit_pred = query smallf (GPT-3)
             # 3. edit_gold = target_or_reference_texts
             # 4. reward = metric(edit_pred, edit_gold)
+
+            calls += 1
 
             state = current_observation.input_encoded_pt
             input_wfeed = self.tokenizer.decode(state[0], skip_special_tokens=True)
@@ -94,13 +148,13 @@ class EditMatch(RewardFunction):
 
             # Here with some probability we append one of "Reorder" or "Insert"
             # to the input_wfeed.
-            prob = random.uniform(0, 1)
-            if prob < 0.25:
-                append = " Reorder"
-            elif prob < 5:
-                append = " Insert"
-            else:
-                append = ""
+            # prob = random.uniform(0, 1)
+            # if prob < 0.25:
+            #     append = " Reorder"
+            # elif prob < 5:
+            #     append = " Insert"
+            # else:
+            #     append = ""
 
             # Query GPT-3
             edit_pred = get_generations_gpt3(
@@ -111,17 +165,18 @@ class EditMatch(RewardFunction):
                 temperature=0.0,
                 batch_size=20,
                 max_length=50,
-                penalty=0.7,
+                penalty=0.5,
                 n=1,
                 keyfile="openai_key_me",
             )
-            edit_pred = edit_pred[0] + append
+            edit_pred = edit_pred[0] # + append
             edit_pred = edit_pred.strip()  # Strip whitespace.
 
             # Reward
             edit_gold = current_observation.target_or_reference_texts[0]
             reward = self.metric(edit_pred, edit_gold)
-            print("\n\nedit_pred:\n\n{}\t{}".format(edit_pred, reward))
+            print("{}\n{}\n".format(prompt_or_input_text, feedback_pred))
+            print("{}\t{}".format(edit_pred, reward))
             return reward + 0.0
 
         return 0
