@@ -1,5 +1,6 @@
 from rl4lms.envs.text_generation.observation import Observation
 from rl4lms.envs.text_generation.reward import RewardFunction
+from rl4lms.envs.text_generation.metric import RougeMetric
 from myutil import get_generations_gpt3
 from typing import Dict, Any, List
 import gem_metrics
@@ -8,6 +9,7 @@ import pdb
 from transformers import AutoTokenizer
 import random
 import re
+from numpy import mean
 
 CACHE_PATH = "/home/rl4lms/rl4lms/cache"
 
@@ -20,12 +22,25 @@ tokenizer_config = {
 }
 
 
-def rouge1_metric(refs: List, preds: List):
-    res = {}
-    p = gem_metrics.texts.Predictions(preds)
-    r = gem_metrics.texts.References(refs)
-    res = gem_metrics.compute(p, r, metrics_list=["rouge"])
-    return res["rouge1"]["fmeasure"]
+def rouge1_metric(pred: List[str], ref: List[List[str]]):
+    res = RougeMetric().compute(
+        prompt_texts=[], generated_texts=pred, reference_texts=ref
+    )
+    return res["lexical/rouge_rouge1"][-1]
+    # res = {}
+    # p = gem_metrics.texts.Predictions({"values": [pred]})
+    # r = gem_metrics.texts.References({"values": [ref]})
+    # res = gem_metrics.compute(p, r, metrics_list=["rouge"])
+    # return res["rouge1"]["fmeasure"]
+
+
+def rouge_combined(pred: List[str], ref: List[List[str]]):
+    rouge_keys = ["rouge1", "rouge2", "rougeL"]
+    res = RougeMetric().compute(
+        prompt_texts=[], generated_texts=pred, reference_texts=ref
+    )
+    rouge_scores = [res["lexical/rouge_" + k][-1] for k in rouge_keys]
+    return mean(rouge_scores)
 
 
 def build_tokenizer(tokenizer_config: Dict[str, Any]):
@@ -127,7 +142,11 @@ def custom_metric(pred, gold):
     return score
 
 
-metric_map = {"custom": custom_metric, "rouge1": rouge1_metric}
+metric_map = {
+    "custom": custom_metric,
+    "rouge1": rouge1_metric,
+    "rouge_combined": rouge_combined,
+}
 
 
 class EditMatch(RewardFunction):
@@ -139,7 +158,7 @@ class EditMatch(RewardFunction):
         self.metric = metric_map[self.metric_name]
         self.prompt = kwargs["prompt_path"]
         self.separator = kwargs["separator"]
-        self.openai_api_key = kwargs["openai_key_hub"]
+        self.openai_api_key = kwargs["openai_key"]
         self.model_name = kwargs["gpt3_model_name"]
         self.cache = {}
 
@@ -208,7 +227,7 @@ class EditMatch(RewardFunction):
 
             # Reward
             edit_gold = current_observation.target_or_reference_texts[0]
-            reward = self.metric(edit_pred, edit_gold)
+            reward = self.metric([edit_pred], [[edit_gold]])
             # print("{}\n{}\n{}\n".format(prompt_or_input_text, feedback_pred, edit_gold))
             # print("{}\t{}".format(edit_pred, reward))
             return reward + 0.0
