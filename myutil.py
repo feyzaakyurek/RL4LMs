@@ -1,13 +1,27 @@
 import json
 import time
 from typing import Dict, List
-
+import pdb, sys
 import openai
 
 # import stopit
 
 from tqdm import tqdm
 
+
+class ForkedPdb(pdb.Pdb):
+    """A Pdb subclass that may be used
+    from a forked multiprocessing child
+
+    """
+
+    def interaction(self, *args, **kwargs):
+        _stdin = sys.stdin
+        try:
+            sys.stdin = open("/dev/stdin")
+            pdb.Pdb.interaction(self, *args, **kwargs)
+        finally:
+            sys.stdin = _stdin
 
 # Intertwines two list of strings.
 def intertwine(m1: List[str], m2: List[str], names: List[str]) -> str:
