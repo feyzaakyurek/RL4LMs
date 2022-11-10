@@ -19,6 +19,7 @@ from rl4lms.envs.text_generation.post_processors import three_sentence_summary
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
 
 from custom_reward import EditMatch
+from custom_metric import EditMatchMetric
 
 class DataPoolRegistry:
     _registry = {
@@ -100,7 +101,8 @@ class MetricRegistry:
         "rouge_l_max": RougeLMax,
         "sacre_bleu": SacreBLEUMetric,
         "ter": TERMetric,
-        "chrf": chrFmetric}
+        "chrf": chrFmetric,
+        "editmatch": EditMatchMetric}
 
     @classmethod
     def get(cls, metric_id: str, kwargs: Dict[str, Any]) -> BaseMetric:
