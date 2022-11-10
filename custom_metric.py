@@ -3,6 +3,11 @@ from typing import List, Dict, Any
 from transformers import PreTrainedModel
 from myutil import get_generations_gpt3, ForkedPdb
 from numpy import mean
+import json
+import os
+import ipdb
+
+CALLS = 0
 
 def rouge1_metric(pred: List[str], ref: List[List[str]]):
     res = RougeMetric().compute(
@@ -35,6 +40,7 @@ class EditMatchMetric(BaseMetric):
         self.separator = kwargs["separator"]
         self.openai_api_key = kwargs["openai_key"]
         self.model_name = kwargs["gpt3_model_name"]
+        self.cache_path = kwargs["cache_path"]
 
         # Load prompt.
         with open(self.prompt, "r") as f:
@@ -44,6 +50,13 @@ class EditMatchMetric(BaseMetric):
         if self.model_name != "code-davinci-002":
             assert self.openai_api_key == "openai_key_ai2"
 
+        # Load cache from cache_path.
+        if os.path.exists(self.cache_path):
+            with open(self.cache_path, "r") as f:
+                self.cache = json.load(f)
+        else:
+            self.cache = {}
+
     def compute(self,
                 prompt_texts: List[str],
                 generated_texts: List[str],
@@ -51,7 +64,7 @@ class EditMatchMetric(BaseMetric):
                 meta_infos: List[Dict[str, Any]] = None,
                 model: PreTrainedModel = None,
                 split_name: str = None):
-
+        
         # Strip off task prefix
         inputs = [prompt.lstrip("Critique: ") for prompt in prompt_texts]
         
@@ -65,9 +78,26 @@ class EditMatchMetric(BaseMetric):
             + "\nEdit:"
         ) for input_text, feedback_pred in zip(inputs, generated_texts)]
 
+        # Check if we have cached results.
+        # Cache queries.
+        cache_queries = [(
+            input_text
+            + "\nFeedback: "
+            + feedback_pred
+            + "\nEdit:"
+        ) for input_text, feedback_pred in zip(inputs, generated_texts)]
+ 
+        cached_results = []
+        uncached_inputs = []
+        for i, input in enumerate(cache_queries):
+            if input in self.cache:
+                cached_results.append((i,self.cache[input]))
+            else:
+                uncached_inputs.append((i,input_wfeed[i]))
+
         # Query GPT-3
         edit_pred = get_generations_gpt3(
-            ls=input_wfeed,
+            ls=[v for _,v in uncached_inputs],
             model_name=self.model_name,
             clean_tok=True,
             stop=[self.separator],
@@ -78,7 +108,28 @@ class EditMatchMetric(BaseMetric):
             n=1,
             keyfile=self.openai_api_key,
         )
-        score = self.downstream_metric(edit_pred, reference_texts)
+
+        # Update cache.
+        uncached_queries = [cache_queries[i] for i,_ in uncached_inputs]
+        self.cache.update(dict(zip(uncached_queries, edit_pred)))
+
+        global CALLS
+        if CALLS % 500 == 0:
+            with open(self.cache_path, "w") as f:
+                json.dump(self.cache, f)
+        CALLS += 1
+
+        edit_pred = iter(edit_pred)
+        uncached_results = [(i, next(edit_pred)) for i,_ in uncached_inputs]
+
+        # Combine cached and uncached results.
+        results = cached_results + uncached_results
+
+        # Sort results by index.
+        results.sort(key=lambda x: x[0])
+        results = [v for _,v in results]
+
+        score = self.downstream_metric(results, reference_texts)
         metric_dict = {
             f"custom_metrics/editmatch_{self.downstream_metric_name}": (None, score)
         }
@@ -163,3 +214,31 @@ metric_map = {
     "rouge1": rouge1_metric,
     "rouge_combined": rouge_combined,
 }
+
+if __name__ == "__main__":
+    args = {
+        "downstream_metric_name": "rouge_combined",
+        "prompt_path": "data/interscript/prompts_edit_functional.txt",
+        "separator": "\n\n---\n\n",
+        "openai_key": "openai_key_me",
+        "gpt3_model_name": "code-davinci-002",
+        "cache_path": "data/interscript/cache_prompts_edit_functional_test.json",
+    }
+
+    metric = EditMatchMetric(**args)
+    metric_dict = metric.compute( 
+        prompt_texts=[
+            "Critique: Goal: plug in nightlight Steps: 1. find pillows and blankets 2. walk to nightlight 3. push button light on",
+            "Critique: Goal: bring baby home Steps: 1. take baby 2. drop baby"
+        ],
+        generated_texts=[
+            "Should plug in the light",
+            "you should drive home"
+        ],
+        reference_texts=[
+            ["[REMOVE] nightlight [END]"],
+            ["[INSERT] drive home [AFTER] take baby [END]"]
+        ]
+    )
+    print(metric_dict)
+    print(CALLS)
