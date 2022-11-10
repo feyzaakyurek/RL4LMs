@@ -23,11 +23,11 @@ class Interscript(TextGenPool):
     ):
         # Read the data
         if split == "train":
-            pth = "./data/interscript/train_n1184_target_edit_t5_largeF.json"
+            pth = "./data/interscript/train_n1184_target_edit_t5_groupinput_largeF.json"
         elif split == "val":
-            pth = "./data/interscript/val_n192_t5_largeF.json"
+            pth = "./data/interscript/val_n192_goal_steps_target_edit_smallf_groupinput.json"
         elif split == "test":
-            pth = "./data/interscript/val_n192_t5_largeF.json"
+            pth = "./data/interscript/val_n192_goal_steps_target_edit_smallf_groupinput.json"
         else:
             raise ValueError("Split not supported")
 
@@ -38,10 +38,12 @@ class Interscript(TextGenPool):
 
         samples = []
         for ix, item in enumerate(data):
+            if type(item["summary"]) != list:
+                item["summary"] = [item["summary"]]
             sample = Sample(
                 id=f"{split}_{ix}",
                 prompt_or_input_text=prompt_prefix + item["text"],
-                references=[item["summary"]],
+                references=item["summary"],
             )
             samples.append(sample)
 
