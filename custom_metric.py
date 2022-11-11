@@ -4,7 +4,7 @@ from transformers import PreTrainedModel
 from myutil import get_generations_gpt3, ForkedPdb
 from numpy import mean
 import json
-import os
+import os, re
 import ipdb
 
 CALLS = 0
@@ -14,22 +14,18 @@ def rouge1_metric(pred: List[str], ref: List[List[str]]):
         prompt_texts=[], generated_texts=pred, reference_texts=ref
     )
     return res["lexical/rouge_rouge1"][-1]
-    # res = {}
-    # p = gem_metrics.texts.Predictions({"values": [pred]})
-    # r = gem_metrics.texts.References({"values": [ref]})
-    # res = gem_metrics.compute(p, r, metrics_list=["rouge"])
-    # return res["rouge1"]["fmeasure"]
 
 
 def rouge_combined(pred: List[str], ref: List[List[str]]):
-    
+
     rouge_keys = ["rouge1", "rouge2", "rougeL"]
     res = RougeMetric().compute(
         prompt_texts=[], generated_texts=pred, reference_texts=ref
     )
     rouge_scores = [res["lexical/rouge_" + k][-1] for k in rouge_keys]
-    return mean(rouge_scores)
-
+    scores = dict(zip(rouge_keys, rouge_scores))
+    scores.update({"rouge_combined": mean(rouge_scores)})
+    return scores
 
 class EditMatchMetric(BaseMetric):
     def __init__(self, *args, **kwargs) -> None:
@@ -41,6 +37,8 @@ class EditMatchMetric(BaseMetric):
         self.openai_api_key = kwargs["openai_key"]
         self.model_name = kwargs["gpt3_model_name"]
         self.cache_path = kwargs["cache_path"]
+
+        assert self.downstream_metric_name in "rouge_combined"
 
         # Load prompt.
         with open(self.prompt, "r") as f:
@@ -78,26 +76,28 @@ class EditMatchMetric(BaseMetric):
             + "\nEdit:"
         ) for input_text, feedback_pred in zip(inputs, generated_texts)]
 
-        # Check if we have cached results.
-        # Cache queries.
-        cache_queries = [(
-            input_text
-            + "\nFeedback: "
-            + feedback_pred
-            + "\nEdit:"
-        ) for input_text, feedback_pred in zip(inputs, generated_texts)]
- 
-        cached_results = []
-        uncached_inputs = []
-        for i, input in enumerate(cache_queries):
-            if input in self.cache:
-                cached_results.append((i,self.cache[input]))
-            else:
-                uncached_inputs.append((i,input_wfeed[i]))
-
+        if self.cache_path != "":
+            # Check if we have cached results.
+            # Cache queries.
+            cache_queries = [(
+                input_text
+                + "\nFeedback: "
+                + feedback_pred
+                + "\nEdit:"
+            ) for input_text, feedback_pred in zip(inputs, generated_texts)]
+    
+            cached_results = []
+            uncached_inputs = []
+            for i, input in enumerate(cache_queries):
+                if input in self.cache:
+                    cached_results.append((i,self.cache[input]))
+                else:
+                    uncached_inputs.append((i,input_wfeed[i]))
+            input_wfeed = [x[1] for x in uncached_inputs]
+        
         # Query GPT-3
         edit_pred = get_generations_gpt3(
-            ls=[v for _,v in uncached_inputs],
+            ls=input_wfeed,
             model_name=self.model_name,
             clean_tok=True,
             stop=[self.separator],
@@ -109,30 +109,33 @@ class EditMatchMetric(BaseMetric):
             keyfile=self.openai_api_key,
         )
 
-        # Update cache.
-        uncached_queries = [cache_queries[i] for i,_ in uncached_inputs]
-        self.cache.update(dict(zip(uncached_queries, edit_pred)))
+        if self.cache_path != "":
+            # Update cache.
+            uncached_queries = [cache_queries[i] for i,_ in uncached_inputs]
+            self.cache.update(dict(zip(uncached_queries, edit_pred)))
 
-        global CALLS
-        if CALLS % 500 == 0:
-            with open(self.cache_path, "w") as f:
-                json.dump(self.cache, f)
-        CALLS += 1
+            global CALLS
+            if CALLS % 1 == 0:
+                with open(self.cache_path, "w") as f:
+                    json.dump(self.cache, f)
+            CALLS += 1
 
-        edit_pred = iter(edit_pred)
-        uncached_results = [(i, next(edit_pred)) for i,_ in uncached_inputs]
+            edit_pred = iter(edit_pred)
+            uncached_results = [(i, next(edit_pred)) for i,_ in uncached_inputs]
 
-        # Combine cached and uncached results.
-        results = cached_results + uncached_results
+            # Combine cached and uncached results.
+            results = cached_results + uncached_results
 
-        # Sort results by index.
-        results.sort(key=lambda x: x[0])
-        results = [v for _,v in results]
+            # Sort results by index.
+            results.sort(key=lambda x: x[0])
+            edit_pred = [v for _,v in results]
 
-        score = self.downstream_metric(results, reference_texts)
-        metric_dict = {
-            f"custom_metrics/editmatch_{self.downstream_metric_name}": (None, score)
-        }
+        scores = self.downstream_metric(edit_pred, reference_texts)
+        metric_dict = {}
+        for k, score in scores.items():
+            metric_dict.update({
+                f"custom_metrics/editmatch_{k}": (None, score)
+            })
         return metric_dict
 
 
@@ -222,7 +225,8 @@ if __name__ == "__main__":
         "separator": "\n\n---\n\n",
         "openai_key": "openai_key_me",
         "gpt3_model_name": "code-davinci-002",
-        "cache_path": "data/interscript/cache_prompts_edit_functional_test.json",
+        "cache_path": "data/interscript/cache.json",
+        # "cache_path": "data/interscript/cache_prompts_edit_functional_test.json",
     }
 
     metric = EditMatchMetric(**args)

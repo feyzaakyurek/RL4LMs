@@ -19,7 +19,7 @@ from rl4lms.envs.text_generation.post_processors import three_sentence_summary
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
 
 from custom_reward import EditMatch
-from rl4lms.envs.text_generation.metric import EditMatchMetric
+from custom_metric import EditMatchMetric
 
 class DataPoolRegistry:
     _registry = {

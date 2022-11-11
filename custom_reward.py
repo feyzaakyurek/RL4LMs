@@ -1,15 +1,10 @@
 from rl4lms.envs.text_generation.observation import Observation
 from rl4lms.envs.text_generation.reward import RewardFunction
-from myutil import get_generations_gpt3, ForkedPdb
 from custom_metric import EditMatchMetric
-from typing import Dict, Any, List
-import gem_metrics
+from typing import Dict, Any
 from transformers import AutoTokenizer
-import random
-import re
-from numpy import mean
+from myutil import ForkedPdb
 
-CACHE_PATH = "/home/rl4lms/rl4lms/cache"
 
 def build_tokenizer(tokenizer_config: Dict[str, Any]):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_config["model_name"])
@@ -29,7 +24,6 @@ class EditMatch(RewardFunction):
         self.tokenizer = build_tokenizer(self.tokenizer_config)
         self.metric = EditMatchMetric(**kwargs["metric"])
         self.cache = {}
-
 
     def __call__(
         self,
