@@ -9,6 +9,7 @@ import ipdb
 
 CALLS = 0
 
+
 def rouge1_metric(pred: List[str], ref: List[List[str]]):
     res = RougeMetric().compute(
         prompt_texts=[], generated_texts=pred, reference_texts=ref
@@ -26,6 +27,7 @@ def rouge_combined(pred: List[str], ref: List[List[str]]):
     scores = dict(zip(rouge_keys, rouge_scores))
     scores.update({"rouge_combined": mean(rouge_scores)})
     return scores
+
 
 class EditMatchMetric(BaseMetric):
     def __init__(self, *args, **kwargs) -> None:
@@ -55,46 +57,49 @@ class EditMatchMetric(BaseMetric):
         else:
             self.cache = {}
 
-    def compute(self,
-                prompt_texts: List[str],
-                generated_texts: List[str],
-                reference_texts: List[List[str]],
-                meta_infos: List[Dict[str, Any]] = None,
-                model: PreTrainedModel = None,
-                split_name: str = None):
-        
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[List[str]],
+        meta_infos: List[Dict[str, Any]] = None,
+        model: PreTrainedModel = None,
+        split_name: str = None,
+    ):
+
         # Strip off task prefix
         inputs = [prompt.lstrip("Critique: ") for prompt in prompt_texts]
-        
+
         # Prepend prompt.
-        input_wfeed = [(
-            self.prompt
-            + self.separator
-            + input_text
-            + "\nFeedback: "
-            + feedback_pred
-            + "\nEdit:"
-        ) for input_text, feedback_pred in zip(inputs, generated_texts)]
+        input_wfeed = [
+            (
+                self.prompt
+                + self.separator
+                + input_text
+                + "\nFeedback: "
+                + feedback_pred
+                + "\nEdit:"
+            )
+            for input_text, feedback_pred in zip(inputs, generated_texts)
+        ]
 
         if self.cache_path != "":
             # Check if we have cached results.
             # Cache queries.
-            cache_queries = [(
-                input_text
-                + "\nFeedback: "
-                + feedback_pred
-                + "\nEdit:"
-            ) for input_text, feedback_pred in zip(inputs, generated_texts)]
-    
+            cache_queries = [
+                (input_text + "\nFeedback: " + feedback_pred + "\nEdit:")
+                for input_text, feedback_pred in zip(inputs, generated_texts)
+            ]
+
             cached_results = []
             uncached_inputs = []
             for i, input in enumerate(cache_queries):
                 if input in self.cache:
-                    cached_results.append((i,self.cache[input]))
+                    cached_results.append((i, self.cache[input]))
                 else:
-                    uncached_inputs.append((i,input_wfeed[i]))
+                    uncached_inputs.append((i, input_wfeed[i]))
             input_wfeed = [x[1] for x in uncached_inputs]
-        
+
         # Query GPT-3
         edit_pred = get_generations_gpt3(
             ls=input_wfeed,
@@ -111,31 +116,29 @@ class EditMatchMetric(BaseMetric):
 
         if self.cache_path != "":
             # Update cache.
-            uncached_queries = [cache_queries[i] for i,_ in uncached_inputs]
+            uncached_queries = [cache_queries[i] for i, _ in uncached_inputs]
             self.cache.update(dict(zip(uncached_queries, edit_pred)))
 
             global CALLS
-            if CALLS % 1 == 0:
+            if CALLS % 500 == 0:
                 with open(self.cache_path, "w") as f:
                     json.dump(self.cache, f)
             CALLS += 1
 
             edit_pred = iter(edit_pred)
-            uncached_results = [(i, next(edit_pred)) for i,_ in uncached_inputs]
+            uncached_results = [(i, next(edit_pred)) for i, _ in uncached_inputs]
 
             # Combine cached and uncached results.
             results = cached_results + uncached_results
 
             # Sort results by index.
             results.sort(key=lambda x: x[0])
-            edit_pred = [v for _,v in results]
+            edit_pred = [v for _, v in results]
 
         scores = self.downstream_metric(edit_pred, reference_texts)
         metric_dict = {}
         for k, score in scores.items():
-            metric_dict.update({
-                f"custom_metrics/editmatch_{k}": (None, score)
-            })
+            metric_dict.update({f"custom_metrics/editmatch_{k}": (None, score)})
         return metric_dict
 
 
@@ -230,19 +233,16 @@ if __name__ == "__main__":
     }
 
     metric = EditMatchMetric(**args)
-    metric_dict = metric.compute( 
+    metric_dict = metric.compute(
         prompt_texts=[
             "Critique: Goal: plug in nightlight Steps: 1. find pillows and blankets 2. walk to nightlight 3. push button light on",
-            "Critique: Goal: bring baby home Steps: 1. take baby 2. drop baby"
+            "Critique: Goal: bring baby home Steps: 1. take baby 2. drop baby",
         ],
-        generated_texts=[
-            "Should plug in the light",
-            "you should drive home"
-        ],
+        generated_texts=["Should plug in the light", "you should drive home"],
         reference_texts=[
             ["[REMOVE] nightlight [END]"],
-            ["[INSERT] drive home [AFTER] take baby [END]"]
-        ]
+            ["[INSERT] drive home [AFTER] take baby [END]"],
+        ],
     )
     print(metric_dict)
     print(CALLS)
