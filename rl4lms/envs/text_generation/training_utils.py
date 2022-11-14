@@ -209,9 +209,10 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                 self.save_trainer_state(
                     self._tracker, self._alg.policy, self._trainer_state)
 
-            # evaluate on val set in the given intervals
+            # evaluate on val and test set in the given intervals
             if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
-                self._evaluate_on_datapools(epoch=epoch, splits=["val"])
+                self._evaluate_on_datapools(epoch=epoch, splits=["val", "test"])
+
 
         # finally evaluate on val and test samples
         self._evaluate_on_datapools(epoch=epoch)
