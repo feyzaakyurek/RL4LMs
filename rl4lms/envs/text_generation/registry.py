@@ -1,13 +1,73 @@
 import imp
-from rl4lms.envs.text_generation.test_reward import RewardIncreasingNumbers, RewardSentencesWithDates
+from rl4lms.envs.text_generation.test_reward import (
+    RewardIncreasingNumbers,
+    RewardSentencesWithDates,
+)
 from rl4lms.envs.text_generation.test_datapool import TestTextGenPool
-from rl4lms.envs.text_generation.metric import BaseMetric, LearnedRewardMetric, MeteorMetric, RougeMetric, BERTScoreMetric, BLEUMetric, BLEURTMetric, DiversityMetrics, SummaCZSMetric, SummaCConvMetric, Perplexity, CIDERMetric, SpiceMetric, ParentToTTo, BLEUToTTo, RougeLMax, SacreBLEUMetric, TERMetric, chrFmetric
-from rl4lms.data_pools.custom_text_generation_pools import IMDB, CommonGen, ToTTo, CNNDailyMail, IMDBForSeq2Seq, NarrativeQA, WMT, WMT14PreprocessedEnDe, WMT16NewsOnlyDatasetEnDe, IWSLT2017EnDe, CRD3DialogueGeneration, Interscript
+from rl4lms.envs.text_generation.metric import (
+    BaseMetric,
+    LearnedRewardMetric,
+    MeteorMetric,
+    RougeMetric,
+    BERTScoreMetric,
+    BLEUMetric,
+    BLEURTMetric,
+    DiversityMetrics,
+    SummaCZSMetric,
+    SummaCConvMetric,
+    Perplexity,
+    CIDERMetric,
+    SpiceMetric,
+    ParentToTTo,
+    BLEUToTTo,
+    RougeLMax,
+    SacreBLEUMetric,
+    TERMetric,
+    chrFmetric,
+)
+from rl4lms.data_pools.custom_text_generation_pools import (
+    IMDB,
+    CommonGen,
+    ToTTo,
+    CNNDailyMail,
+    IMDBForSeq2Seq,
+    NarrativeQA,
+    WMT,
+    WMT14PreprocessedEnDe,
+    WMT16NewsOnlyDatasetEnDe,
+    IWSLT2017EnDe,
+    CRD3DialogueGeneration,
+    Interscript,
+    OpenAISumm,
+)
 from rl4lms.envs.text_generation.test_metric import IncreasingNumbersinText, DateInText
 from rl4lms.data_pools.text_generation_pool import TextGenPool
-from rl4lms.envs.text_generation.reward import RewardFunction, LearnedRewardFunction, MeteorRewardFunction, RougeRewardFunction, BERTScoreRewardFunction, BLEURewardFunction, BLEURTRewardFunction, RougeCombined, SpiderRewardFunction, CommonGenPenaltyShapingFunction, BatchedCommonGenPenaltyShapingFunction, PARENTRewardFunction, SacreBleu, RougeLMaxRewardFunction, TER, chrF
+from rl4lms.envs.text_generation.reward import (
+    RewardFunction,
+    LearnedRewardFunction,
+    MeteorRewardFunction,
+    RougeRewardFunction,
+    BERTScoreRewardFunction,
+    BLEURewardFunction,
+    BLEURTRewardFunction,
+    RougeCombined,
+    SpiderRewardFunction,
+    CommonGenPenaltyShapingFunction,
+    BatchedCommonGenPenaltyShapingFunction,
+    PARENTRewardFunction,
+    SacreBleu,
+    RougeLMaxRewardFunction,
+    TER,
+    chrF,
+)
 from typing import Dict, Type, Any, Union
-from rl4lms.envs.text_generation.policy import BasePolicy, LMActorCriticPolicy, Seq2SeqLMActorCriticPolicy, MaskableLMActorCriticPolicy, MaskableSeq2SeqLMActorCriticPolicy
+from rl4lms.envs.text_generation.policy import (
+    BasePolicy,
+    LMActorCriticPolicy,
+    Seq2SeqLMActorCriticPolicy,
+    MaskableLMActorCriticPolicy,
+    MaskableSeq2SeqLMActorCriticPolicy,
+)
 
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
@@ -18,8 +78,8 @@ from rl4lms.algorithms.a2c.a2c import A2C
 from rl4lms.envs.text_generation.post_processors import three_sentence_summary
 from rl4lms.envs.text_generation.alg_wrappers import wrap_onpolicy_alg
 
-from custom_reward import EditMatch
-from custom_metric import EditMatchMetric
+from custom_reward import EditMatch, EditMatchMetric
+
 
 class DataPoolRegistry:
     _registry = {
@@ -35,7 +95,9 @@ class DataPoolRegistry:
         "wmt16newsonly": WMT16NewsOnlyDatasetEnDe,
         "iwslt2017en_de": IWSLT2017EnDe,
         "crd3": CRD3DialogueGeneration,
-        "interscript": Interscript}
+        "interscript": Interscript,
+        "openai_summ": OpenAISumm,
+    }
 
     @classmethod
     def get(cls, datapool_id: str, kwargs: Dict[str, Any]) -> TextGenPool:
@@ -67,7 +129,8 @@ class RewardFunctionRegistry:
         "rouge_l_max": RougeLMaxRewardFunction,
         "ter": TER,
         "chrf": chrF,
-        "editmatch": EditMatch}
+        "editmatch": EditMatch,
+    }
 
     @classmethod
     def get(cls, reward_fn_id: str, kwargs: Dict[str, Any]) -> RewardFunction:
@@ -102,7 +165,8 @@ class MetricRegistry:
         "sacre_bleu": SacreBLEUMetric,
         "ter": TERMetric,
         "chrf": chrFmetric,
-        "editmatch": EditMatchMetric}
+        "editmatch": EditMatchMetric,
+    }
 
     @classmethod
     def get(cls, metric_id: str, kwargs: Dict[str, Any]) -> BaseMetric:
@@ -120,7 +184,7 @@ class PolicyRegistry:
         "causal_lm_actor_critic_policy": LMActorCriticPolicy,
         "seq2seq_lm_actor_critic_policy": Seq2SeqLMActorCriticPolicy,
         "maskable_causal_lm_actor_critic_policy": MaskableLMActorCriticPolicy,
-        "maskable_seq2seq_lm_actor_critic_policy": MaskableSeq2SeqLMActorCriticPolicy
+        "maskable_seq2seq_lm_actor_critic_policy": MaskableSeq2SeqLMActorCriticPolicy,
     }
 
     @classmethod
@@ -142,7 +206,9 @@ class AlgorithmRegistry:
     }
 
     @classmethod
-    def get(cls, alg_id: str) -> Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]:
+    def get(
+        cls, alg_id: str
+    ) -> Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]:
         try:
             alg_cls = cls._registry[alg_id]
         except KeyError:
@@ -150,7 +216,9 @@ class AlgorithmRegistry:
         return alg_cls
 
     @classmethod
-    def add(cls, id: str, alg_cls: Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]):
+    def add(
+        cls, id: str, alg_cls: Union[Type[OnPolicyAlgorithm], Type[OffPolicyAlgorithm]]
+    ):
         AlgorithmRegistry._registry[id] = alg_cls
 
 
