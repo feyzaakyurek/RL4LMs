@@ -34,7 +34,6 @@ class EditMatchMetric(BaseMetric):
         self.model_name = kwargs["gpt3_model_name"]
         self.cache_path = kwargs["cache_path"]
 
-
         assert self.downstream_metric_name in "rouge_combined"
 
         # Load prompt.
@@ -64,6 +63,7 @@ class EditMatchMetric(BaseMetric):
 
         # Strip off task prefix
         inputs = [prompt.lstrip("Critique: ") for prompt in prompt_texts]
+        inputs = [prompt.lstrip("critique: ") for prompt in inputs]
 
         # Prepend prompt.
         input_wfeed = [
@@ -103,8 +103,8 @@ class EditMatchMetric(BaseMetric):
             stop=[self.separator],
             temperature=0.0,
             batch_size=20,
-            max_length=50,
-            penalty=0.5,
+            max_length=150,
+            penalty=0.0,
             n=1,
             keyfile=self.openai_api_key,
         )
@@ -132,7 +132,8 @@ class EditMatchMetric(BaseMetric):
 
         scores = self.downstream_metric(edit_pred, reference_texts)
         em_cm = [
-            exact_match_scripting(pred, gold) for pred, gold in zip(edit_pred, reference_texts)
+            exact_match_scripting(pred, gold)
+            for pred, gold in zip(edit_pred, reference_texts)
         ]
         em = mean([e[0] for e in em_cm])
         custom = mean([e[1] for e in em_cm])
