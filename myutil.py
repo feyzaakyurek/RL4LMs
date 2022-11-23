@@ -125,30 +125,27 @@ def get_generations_gpt3(
     for chunk in tqdm(chunks_ls, total=len(chunks_ls)):
         # create a completion
         lst = [el.rstrip(" ") for el in chunk]
-        try:
-            completion = openai.Completion.create(
-                engine=model_name,
-                prompt=lst,
-                max_tokens=max_length,
-                temperature=temperature,
-                n=n,
-                top_p=top_p,
-                stop=stop,
-                frequency_penalty=penalty,
-            )
-        except Exception as e:
-            print(e)
-            time.sleep(60)
-            completion = openai.Completion.create(
-                engine=model_name,
-                prompt=lst,
-                max_tokens=max_length,
-                temperature=temperature,
-                n=n,
-                top_p=top_p,
-                stop=stop,
-                frequency_penalty=penalty,
-            )
+        success = False
+        retries = 1
+        while not success and retries < 10:
+            try:
+                completion = openai.Completion.create(
+                    engine=model_name,
+                    prompt=lst,
+                    max_tokens=max_length,
+                    temperature=temperature,
+                    n=n,
+                    top_p=top_p,
+                    stop=stop,
+                    frequency_penalty=penalty,
+                )
+                success = True
+            except Exception as e:
+                wait = retries * 60
+                print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...')
+                sys.stdout.flush()
+                time.sleep(wait)
+                retries += 1
 
         # Process the completions
         comps = [c.text for c in completion.choices]
