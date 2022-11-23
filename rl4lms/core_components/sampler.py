@@ -22,12 +22,11 @@ class PrioritySampler:
         self.item_priorities.append(priority)
 
     def sample(self, size: int) -> List[Any]:
+        np.random.seed(0)
         min_sample_size = min(len(self.items), size)
-        scaled_item_priorities = np.array(
-            self.item_priorities) ** self.priority_scale
+        scaled_item_priorities = np.array(self.item_priorities) ** self.priority_scale
         sample_probs = scaled_item_priorities / np.sum(scaled_item_priorities)
-        samples = np.random.choice(
-            a=self.items, p=sample_probs, size=min_sample_size)
+        samples = np.random.choice(a=self.items, p=sample_probs, size=min_sample_size)
         return samples
 
     def update(self, item: Any, priority: float):
