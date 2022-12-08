@@ -64,6 +64,7 @@ class EditMatchMetric(BaseMetric):
         # Strip off task prefix
         inputs = [prompt.lstrip("Critique: ") for prompt in prompt_texts]
         inputs = [prompt.lstrip("critique: ") for prompt in inputs]
+        inputs = [prompt.lstrip("passage: ") for prompt in inputs]
 
         # Prepend prompt.
         input_wfeed = [
@@ -100,7 +101,7 @@ class EditMatchMetric(BaseMetric):
             ls=input_wfeed,
             model_name=self.model_name,
             clean_tok=True,
-            stop=[self.separator],
+            stop=[self.separator, "Edit:", "Feedback:", "Question:"],
             temperature=0.0,
             batch_size=20,
             max_length=150,
@@ -200,7 +201,7 @@ def rouge1_metric(pred: List[str], ref: List[List[str]]):
 def rouge_combined(pred: List[str], ref: List[List[str]]):
 
     rouge_keys = ["rouge1", "rouge2", "rougeL"]
-    res = RougeMetric().compute(
+    res = RougeMetric(use_single_ref=False).compute(
         prompt_texts=[], generated_texts=pred, reference_texts=ref
     )
     rouge_scores = [res["lexical/rouge_" + k][-1] for k in rouge_keys]
@@ -315,7 +316,7 @@ if __name__ == "__main__":
 
     args = {
         "downstream_metric_name": "rouge_combined",
-        "prompt_path": "data/interscript/prompts_edit_functional.txt",
+        "prompt_path": "data/interscript/prompts_edit_numeric.txt",
         "separator": "\n\n---\n\n",
         "openai_key": "openai_key_me",
         "gpt3_model_name": "code-davinci-002",
