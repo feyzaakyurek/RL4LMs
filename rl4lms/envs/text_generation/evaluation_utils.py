@@ -3,10 +3,11 @@ from transformers import AutoTokenizer
 
 from rl4lms.data_pools.custom_text_generation_pools import Sample
 from rl4lms.envs.text_generation.metric import BaseMetric
+from custom_reward import EditMatchMetric
 from rl4lms.envs.text_generation.logging_utils import Tracker
 from typing import List, Dict, Any
 from tqdm import tqdm
-
+import ipdb
 
 def get_batch(samples: List[Sample], batch_size: int):
     current_ix = 0
@@ -52,9 +53,15 @@ def evaluate_on_samples(policy: BasePolicy,
     sample_scores_by_metric = {}
     if metrics is not None:
         for metric in metrics:
-            metric_dict = metric.compute(
-                all_prompt_texts, all_generated_texts, all_ref_texts,
-                all_meta_infos, policy.get_language_model(), split_name)
+            if isinstance(metric, EditMatchMetric):
+   
+                metric_dict = metric.compute(
+                    all_prompt_texts, all_generated_texts, all_ref_texts,
+                    all_meta_infos, policy.get_language_model(), split_name, epoch)
+            else:
+                metric_dict = metric.compute(
+                    all_prompt_texts, all_generated_texts, all_ref_texts,
+                    all_meta_infos, policy.get_language_model(), split_name)
 
             for metric_key, (sample_scores, corpus_score) in metric_dict.items():
                 if sample_scores is None:
