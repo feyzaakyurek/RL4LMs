@@ -23,11 +23,14 @@ class Interscript(TextGenPool):
     ):
         # Read the data
         if split == "train":
-            pth = "./data/interscript/train_n1184_target_edit_group_goal_steps_t5.json"
+            # pth = "/projectnb/llamagrp/feyzanb/feedback/data/interscript/dev_t5_small.json"
+            pth = "/projectnb/llamagrp/feyzanb/feedback/data/interscript/train_n1158_target_edit_numeric_group_goal_steps_t5.json"
         elif split == "val":
-            pth = "./data/interscript/dev_n192_target_edit_group_goal_steps_t5.json"
+            # pth = "/projectnb/llamagrp/feyzanb/feedback/data/interscript/dev_t5_small.json"
+            pth = "/projectnb/llamagrp/feyzanb/feedback/data/interscript/dev_n190_target_edit_numeric_group_goal_steps_t5.json"
         elif split == "test":
-            pth = "./data/interscript/test_n722_target_edit_group_goal_steps_t5.json"
+            # pth = "/projectnb/llamagrp/feyzanb/feedback/data/interscript/dev_t5_small.json"
+            pth = "/projectnb/llamagrp/feyzanb/feedback/data/interscript/test_n678_target_edit_numeric_group_goal_steps_t5.json"
         else:
             raise ValueError("Split not supported")
 
