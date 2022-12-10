@@ -33,6 +33,7 @@ class EditMatchMetric(BaseMetric):
         self.openai_api_key = kwargs["openai_key"]
         self.model_name = kwargs["gpt3_model_name"]
         self.cache_path = kwargs["cache_path"]
+        self.save_path = kwargs["save_path"]
 
         assert self.downstream_metric_name in "rouge_combined"
 
@@ -59,6 +60,7 @@ class EditMatchMetric(BaseMetric):
         meta_infos: List[Dict[str, Any]] = None,
         model: PreTrainedModel = None,
         split_name: str = None,
+        epoch: int = None,
     ):
 
         # Strip off task prefix
@@ -132,13 +134,23 @@ class EditMatchMetric(BaseMetric):
             edit_pred = [v for _, v in results]
 
         scores = self.downstream_metric(edit_pred, reference_texts)
-        em_cm = [
-            exact_match_scripting(pred, gold)
-            for pred, gold in zip(edit_pred, reference_texts)
-        ]
-        em = mean([e[0] for e in em_cm])
-        custom = mean([e[1] for e in em_cm])
-        scores.update({"exact_match": em, "custom_step": custom})
+        # em_cm = [
+        #     exact_match_scripting(pred, gold)
+        #     for pred, gold in zip(edit_pred, reference_texts)
+        # ]
+        # em = mean([e[0] for e in em_cm])
+        # custom = mean([e[1] for e in em_cm])
+        # scores.update({"exact_match": em, "custom_step": custom})
+
+        # Save edit_pred to save_path using split_name and epoch.
+        if self.save_path != "" and split_name in ["test", "val"]:
+            save_path = os.path.join(
+                self.save_path, f"{split_name}_editmatch_{epoch}.json"
+            )
+            with open(save_path, "w") as f:
+                json.dump(edit_pred, f)
+
+
         metric_dict = {}
         for k, score in scores.items():
             metric_dict.update({f"custom_metrics/editmatch_{k}": (None, score)})
