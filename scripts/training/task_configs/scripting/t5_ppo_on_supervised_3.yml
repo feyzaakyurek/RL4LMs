@@ -11,7 +11,7 @@ reward_fn:
       prompt_path: "/projectnb/llamagrp/feyzanb/feedback/data/interscript/prompts_edit_numeric.txt"
       separator: "\n\n---\n\n"
       downstream_metric_name: rouge_combined
-      openai_key: openai_key_hub
+      openai_key: openai_key_der
       gpt3_model_name: code-davinci-002
       cache_path: ""
       save_path: ""
@@ -30,7 +30,7 @@ datapool:
 env:
   n_envs: 10
   args:
-    max_prompt_length: 90
+    max_prompt_length: 128
     max_episode_length: 100
     terminate_on_eos: True
     prompt_truncation_side: "right"
@@ -40,12 +40,11 @@ alg:
   id: ppo
   args: 
     n_steps: 64
-    batch_size: 8
+    batch_size: 16
     verbose: 1
-    learning_rate: 0.0000001
+    learning_rate: 0.000001
     n_epochs: 5
     ent_coef: 0.0
-    verbose: 0
   kl_div:
     coeff: 0.01
     target_kl: 0.2
@@ -59,32 +58,31 @@ alg:
         weight_decay: 0.01
       generation_kwargs:
         do_sample: True
-        temperature: 0.7
+        top_k: 200
         min_length: 15
-        max_new_tokens: 50
+        max_new_tokens: 100
         repetition_penalty: 0.2
     
 train_evaluation:
-  eval_batch_size: 64
+  eval_batch_size: 128
   seed: 0
-  n_iters: 100
-  eval_every: 1
-  save_every: 1
+  n_iters: 800
+  eval_every: 5
+  save_every: 5
   metrics:
     # - id: meteor
     #   args: {}
-    # - id: rouge
-    # - id: bleu
-    #   args: {}
+    - id: rouge
+    - id: bleu
+      args: {}
     - id: editmatch
       args: 
         prompt_path: "/projectnb/llamagrp/feyzanb/feedback/data/interscript/prompts_edit_numeric.txt"
         separator: "\n\n---\n\n"
         downstream_metric_name: rouge_combined
-        openai_key: openai_key_hub
+        openai_key: openai_key_der
         gpt3_model_name: code-davinci-002
         cache_path: ""
-        save_path: ""
     # - id: bert_score
     #   args:
     #     language: en
@@ -106,5 +104,5 @@ train_evaluation:
     top_k: 0
     temperature: 0.3
     min_length: 15
-    max_new_tokens: 50
+    max_new_tokens: 100
 
