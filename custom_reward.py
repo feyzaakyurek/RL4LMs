@@ -34,6 +34,7 @@ class EditMatchMetric(BaseMetric):
         self.model_name = kwargs["gpt3_model_name"]
         self.cache_path = kwargs["cache_path"]
         self.save_path = kwargs["save_path"]
+        self.append_feedback_to_q = kwargs.get("append_feedback_to_q", False)
 
         assert self.downstream_metric_name in "rouge_combined"
 
@@ -68,18 +69,39 @@ class EditMatchMetric(BaseMetric):
         inputs = [prompt.lstrip("critique: ") for prompt in inputs]
         inputs = [prompt.lstrip("passage: ") for prompt in inputs]
 
-        # Prepend prompt.
-        input_wfeed = [
-            (
-                self.prompt
-                + self.separator
-                + input_text
-                + "\nFeedback: "
-                + feedback_pred
-                + "\nEdit:"
-            )
-            for input_text, feedback_pred in zip(inputs, generated_texts)
-        ]
+        if self.append_feedback_to_q:
+            # Prepend prompt.
+            input_wfeed = []
+            for input_text, feedback_pred in zip(inputs, generated_texts):
+                # Get text between "Question: " and "\n\nAnswer:"
+                it = input_text
+                it = it.replace("\n", " ")
+                question = re.search("Question: (.*)Answer:", it).group(1).strip()
+                input_wfeed.append(
+                    (
+                        self.prompt
+                        + self.separator
+                        + input_text
+                        + "\n\nQuestion: "
+                        + question
+                        + " "
+                        + feedback_pred
+                        + "\n\nAnswer:"
+                    )
+                )
+        else:
+            # Prepend prompt.
+            input_wfeed = [
+                (
+                    self.prompt
+                    + self.separator
+                    + input_text
+                    + "\nFeedback: "
+                    + feedback_pred
+                    + "\nEdit:"
+                )
+                for input_text, feedback_pred in zip(inputs, generated_texts)
+            ]
 
         if self.cache_path != "":
             # Check if we have cached results.
