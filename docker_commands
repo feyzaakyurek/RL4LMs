@@ -6,3 +6,28 @@ beaker image create --name t5large_openai_summary t5large_openai_summary
 docker run -it --rm t5large_openai_summary ./myscripts/run_openai_summ.sh
 # Create job
 beaker experiment create beaker-config-openai-summ-sup-ppo.yaml
+
+
+# Important notes:
+The mount path in beaker config file should match the code config under scripts/training/task_configs/{openai_summ,scripting}
+It's indicated multiple times in that file.
+
+RL4LMs/rl4lms/data_pools/custom_text_generation_pools.py:
+This file contains the dataset loaders. One should fix the paths to data files.
+If creating a new data class, you should then register it at
+RL4LMs/rl4lms/envs/text_generation/registry.py
+
+RL4LMs/custom_reward.py:
+I define my metric and reward functions in here.
+
+RL4LMs/scripts/training/task_configs/scripting/t5_ppo_on_supervised.yml:
+Where all job config is defined. Make sure to change the key name to yours.
+
+Dockerfile:
+Make sure to copy all necessary files to the docker image, including the keyfile.
+
+myutil.py:
+Contains API query calls and other utils.
+
+RL4LMs/myscripts/_run_scripting.sh:
+Edit WANDB key, add --project_name, --entity_name, --experiment_name for wandb logging.
