@@ -127,7 +127,7 @@ def get_generations_gpt3(
         lst = [el.rstrip(" ") for el in chunk]
         success = False
         retries = 1
-        while not success and retries < 10:
+        while not success and retries < 200:
             try:
                 completion = openai.Completion.create(
                     engine=model_name,
