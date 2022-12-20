@@ -1,0 +1,8 @@
+# Build docker
+docker build -t t5large_openai_summary . 
+# Create beaker image
+beaker image create --name t5large_openai_summary t5large_openai_summary
+# Test locally
+docker run -it --rm t5large_openai_summary ./myscripts/run_openai_summ.sh
+# Create job
+beaker experiment create beaker-config-openai-summ-sup-ppo.yaml

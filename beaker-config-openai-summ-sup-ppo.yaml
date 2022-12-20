@@ -1,0 +1,27 @@
+version: v2
+description: t5large_openai_summ
+tasks:
+  # We only have one step in our experiment, so there's only one entry in this list
+  - name: t5large_openai_summ
+    image:
+      # You will want to replace `username` below with your Beaker username
+      beaker: feyzaa/t5large_openai_summ # fixme
+    command: [./myscripts/run_openai_summ.sh] # fixme
+    datasets:
+    - mountPath: '/input/t5large_openai_summ_QMQ3V'
+      source:
+        beaker: 01GJDFJHJ5QAP7PSQYXENQMQ3V
+    result:
+      # Beaker will capture anything that's written to this location and store it in the results
+      # dataset.
+      path: /output/t5
+    resources:
+      gpuCount: 1
+    context:
+      cluster: ai2/aristo-cirrascale
+      priority: normal
+
+#   datasets:
+# - mountPath: '/input/t5'
+#   source:
+#     beaker: 01GJ1E7NFVGTTC652QTPKXYCTR

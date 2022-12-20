@@ -1,0 +1,22 @@
+version: v2
+description: t5large_scripting_rougec_critic_j7pwa_edit_numeric
+tasks:
+  # We only have one step in our experiment, so there's only one entry in this list
+  - name: t5large_scripting_rougec_critic_j7pwa_edit_numeric
+    image:
+      # You will want to replace `username` below with your Beaker username
+      beaker: feyzaa/t5large_scripting_rougec_critic_j7pwa_edit_numeric
+    command: [./myscripts/run_scripting.sh]
+    datasets:
+    - mountPath: /input/t5large_critic_J7PWA # '/input/t5large_critic_n500'
+      source:
+        beaker: 01GFE1VFGPJB3609RAK8KAA0JC # 01GGWMYYBBF6TFCCDPG41AHB7M # 01GGB1PFYF2NRG2NTCCGEA5NPK # 01GGAB1VP6FBW686EQ9WCEXEAN # 01GDTTJ73WGQ0VHDGW102BXK4B
+    result:
+      # Beaker will capture anything that's written to this location and store it in the results
+      # dataset.
+      path: /output/t5
+    resources:
+      gpuCount: 2
+    context:
+      cluster: ai2/aristo-cirrascale
+      priority: normal

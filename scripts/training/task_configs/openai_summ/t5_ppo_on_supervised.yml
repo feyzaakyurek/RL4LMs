@@ -1,0 +1,108 @@
+tokenizer:
+  model_name: /input/t5large_openai_summ_QMQ3V
+  padding_side: right
+  truncation_side: right
+  pad_token_as_eos_token: False
+
+reward_fn:
+  id: editmatch
+  args:
+    metric:
+      prompt_path: "data/openai_summ/topic/prompts_edit_instructional.txt"
+      separator: "\n\n---\n\n"
+      downstream_metric_name: rouge_combined
+      openai_key: openai_key_me
+      gpt3_model_name: code-davinci-002
+      cache_path: ""
+    tokenizer:
+      model_name: /input/t5large_openai_summ_QMQ3V
+      padding_side: right
+      truncation_side: right
+      pad_token_as_eos_token: False
+  
+datapool:
+  id: openai_summ
+  args:
+    prompt_prefix: "passage: " # "critique: "
+    stage: ppo
+# or "critique" for summarization.
+
+env:
+  n_envs: 10
+  args:
+    max_episode_length: 180
+    terminate_on_eos: True
+    prompt_truncation_side: "right"
+    max_prompt_length: 2500
+    # context_start_token: 0
+
+alg:
+  id: ppo
+  args: 
+    n_steps: 256
+    batch_size: 4
+    verbose: 0
+    learning_rate: 0.000001
+    n_epochs: 5
+    ent_coef: 0.001
+  kl_div:
+    coeff: 0.01
+    target_kl: 0.2
+  policy:
+    id: seq2seq_lm_actor_critic_policy
+    args:
+      model_name: /input/t5large_openai_summ_QMQ3V #/Users/feyza/Desktop/t5large_openai_summ_QMQ3V
+      apply_model_parallel: True
+      prompt_truncation_side: "right"
+      optimizer_kwargs:
+        weight_decay: 0.01
+      generation_kwargs:
+        do_sample: True
+        top_k: 100
+        min_length: 20
+        max_new_tokens: 180
+        repetition_penalty: 0.2
+    
+train_evaluation:
+  eval_batch_size: 4
+  seed: 0
+  n_iters: 400
+  eval_every: 5
+  save_every: 5
+  metrics:
+    # - id: meteor
+    #   args: {}
+    - id: rouge
+    - id: bleu
+      args: {}
+    # - id: editmatch
+    #   args: 
+    #     prompt_path: "data/openai_summ/topic/prompts_edit_instructional.txt"
+    #     separator: "\n\n---\n\n"
+    #     downstream_metric_name: rouge_combined
+    #     openai_key: openai_key_me
+    #     gpt3_model_name: code-davinci-002
+    #     cache_path: ""
+    # - id: bert_score
+    #   args:
+    #     language: en
+    # - id: bleurt
+    #   args:
+    #     config_name: bleurt-large-512
+    - id: diversity
+      args: {}
+    # - id: summaCZS
+    #   args:
+    #     granularity: sentence
+    #     use_ent: True
+    #     use_con: False
+    # - id: summaCConv
+    #   args:
+    #     granularity: sentence
+  generation_kwargs:
+    do_sample: True
+    top_k: 0
+    temperature: 0.7
+    min_length: 20
+    max_new_tokens: 180
+
