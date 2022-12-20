@@ -29,5 +29,5 @@ Make sure to copy all necessary files to the docker image, including the keyfile
 myutil.py:
 Contains API query calls and other utils.
 
-RL4LMs/myscripts/_run_scripting.sh:
+RL4LMs/myscripts/run_scripting_simple.sh:
 Edit WANDB key, add --project_name, --entity_name, --experiment_name for wandb logging.
