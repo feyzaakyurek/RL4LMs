@@ -70,15 +70,11 @@ class OpenAISumm(TextGenPool):
 
         # Read the data
         if split == "train":
-            pth = (
-                f"./data/openai_summ/topic/train_passage_question_answer_2_{stage}.json"
-            )
+            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/train_passage_question_answer_2_{stage}.json"
         elif split == "val":
-            pth = f"./data/openai_summ/topic/dev_passage_question_answer_2_{stage}.json"
+            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/dev_passage_question_answer_2_{stage}.json"
         elif split == "test":
-            pth = (
-                f"./data/openai_summ/topic/test_passage_question_answer_2_{stage}.json"
-            )
+            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/test_passage_question_answer_2_{stage}.json"
         else:
             raise ValueError("Split not supported")
 
