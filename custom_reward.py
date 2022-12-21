@@ -10,7 +10,9 @@ import json
 import os, re
 
 CALLS = 0
-
+GPT3_CACHE = {}
+ATTEMPTS = 0
+HITS = 0
 
 def build_tokenizer(tokenizer_config: Dict[str, Any]):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_config["model_name"])
@@ -35,8 +37,9 @@ class EditMatchMetric(BaseMetric):
         self.cache_path = kwargs["cache_path"]
         self.save_path = kwargs["save_path"]
         self.append_feedback_to_q = kwargs.get("append_feedback_to_q", False)
+        self.lambda_rouge_input = kwargs.get("lambda_rouge_input", 0.3)
 
-        assert self.downstream_metric_name in "rouge_combined"
+        assert self.downstream_metric_name in ["rouge_combined", "rouge_combined_diff", "rouge_combined_plus_rouge_input"]
 
         # Load prompt.
         with open(self.prompt, "r") as f:
@@ -48,10 +51,10 @@ class EditMatchMetric(BaseMetric):
 
         # Load cache from cache_path.
         if os.path.exists(self.cache_path):
+            global GPT3_CACHE
             with open(self.cache_path, "r") as f:
-                self.cache = json.load(f)
-        else:
-            self.cache = {}
+                GPT3_CACHE = json.load(f)
+
 
     def compute(
         self,
@@ -63,6 +66,7 @@ class EditMatchMetric(BaseMetric):
         split_name: str = None,
         epoch: int = None,
     ):
+        global GPT3_CACHE, CALLS, ATTEMPTS, HITS
 
         # Strip off task prefix
         inputs = [prompt.lstrip("Critique: ") for prompt in prompt_texts]
@@ -104,18 +108,27 @@ class EditMatchMetric(BaseMetric):
             ]
 
         if self.cache_path != "":
+            
+            # If GPT3_CACHE is empty, load it from cache_path.
+            if len(GPT3_CACHE) == 0:
+                with open(self.cache_path, "r") as f:
+                    GPT3_CACHE = json.load(f)
+
             # Check if we have cached results.
             # Cache queries.
-            cache_queries = [
-                (input_text + "\nFeedback: " + feedback_pred + "\nEdit:")
-                for input_text, feedback_pred in zip(inputs, generated_texts)
-            ]
+            cache_queries = [el for el in input_wfeed]
+            # [
+            #     (input_text + "\nFeedback: " + feedback_pred + "\nEdit:")
+            #     for input_text, feedback_pred in zip(inputs, generated_texts)
+            # ]
 
             cached_results = []
             uncached_inputs = []
             for i, input in enumerate(cache_queries):
-                if input in self.cache:
-                    cached_results.append((i, self.cache[input]))
+                ATTEMPTS += 1
+                if input in GPT3_CACHE:
+                    HITS += 1
+                    cached_results.append((i, GPT3_CACHE[input]))
                 else:
                     uncached_inputs.append((i, input_wfeed[i]))
             input_wfeed = [x[1] for x in uncached_inputs]
@@ -137,12 +150,13 @@ class EditMatchMetric(BaseMetric):
         if self.cache_path != "":
             # Update cache.
             uncached_queries = [cache_queries[i] for i, _ in uncached_inputs]
-            self.cache.update(dict(zip(uncached_queries, edit_pred)))
+            GPT3_CACHE.update(dict(zip(uncached_queries, edit_pred)))
 
-            global CALLS
-            if CALLS % 500 == 0:
+            if CALLS % 1 == 0:
+                print("Size: ", len(GPT3_CACHE), "Attempts: ", ATTEMPTS, "Hits: ", HITS, "Ratio: ", HITS / ATTEMPTS)
+                print("Saving cache to", self.cache_path)
                 with open(self.cache_path, "w") as f:
-                    json.dump(self.cache, f)
+                    json.dump(GPT3_CACHE, f)
             CALLS += 1
 
             edit_pred = iter(edit_pred)
@@ -155,14 +169,22 @@ class EditMatchMetric(BaseMetric):
             results.sort(key=lambda x: x[0])
             edit_pred = [v for _, v in results]
 
-        scores = self.downstream_metric(edit_pred, reference_texts)
-        # em_cm = [
-        #     exact_match_scripting(pred, gold)
-        #     for pred, gold in zip(edit_pred, reference_texts)
-        # ]
-        # em = mean([e[0] for e in em_cm])
-        # custom = mean([e[1] for e in em_cm])
-        # scores.update({"exact_match": em, "custom_step": custom})
+        if self.downstream_metric_name == "rouge_combined_plus_rouge_input":
+            # Strip off the part that starts with "Question:"
+            # Note that this doesn't apply for interscript - but doesn't hurt either.
+            inputs = [re.sub("Question:.*", "", input) for input in inputs]
+            scores = self.downstream_metric(edit_pred, reference_texts, generated_texts, inputs)
+        elif self.downstream_metric_name == "rouge_combined_diff":
+            try:
+                # Retrieve the part that is after "Answer:"
+                init_pred = [re.search("Answer:(.*)", input).group(1).strip() for input in inputs]
+                scores = self.downstream_metric(edit_pred, reference_texts, init_pred)
+            except:
+                init_pred = [re.search("Steps:(.*)", input).group(1).strip() for input in inputs]
+                scores = self.downstream_metric(edit_pred, reference_texts, init_pred)
+        else:
+            scores = self.downstream_metric(edit_pred, reference_texts)
+
 
         # Save edit_pred to save_path using split_name and epoch.
         if self.save_path != "" and split_name in ["test", "val"]:
@@ -185,7 +207,6 @@ class EditMatch(RewardFunction):
         self.tokenizer_config = kwargs["tokenizer"]
         self.tokenizer = build_tokenizer(self.tokenizer_config)
         self.metric = EditMatchMetric(**kwargs["metric"])
-        self.cache = {}
 
     def __call__(
         self,
@@ -242,6 +263,34 @@ def rouge_combined(pred: List[str], ref: List[List[str]]):
     scores = dict(zip(rouge_keys, rouge_scores))
     scores.update({"rouge_combined": mean(rouge_scores)})
     return scores
+
+
+def rouge_combined_diff(pred: List[str], ref: List[List[str]], init_pred: List[str]):
+    scores = rouge_combined(pred, ref)
+    scores_init = rouge_combined(init_pred, ref)
+    scores_diff = {
+        "rouge_combined_diff": scores["rouge_combined"] - scores_init["rouge_combined"],
+        "rouge_combined_init": scores_init["rouge_combined"],
+    }
+    scores.update(scores_diff)
+    return scores
+
+
+def rouge_combined_plus_rouge_input(
+        pred: List[str],
+        ref: List[List[str]],
+        feedback: List[str],
+        inputs: List[str],
+        lambda_rouge_input: float = 0.3,
+    ):
+    scores = rouge_combined(pred, ref)
+    score_feedback = rouge1_metric(feedback, [[inp] for inp in inputs])
+    combined_score = scores['rouge_combined'] + lambda_rouge_input * score_feedback
+    scores.update({"rouge_combined_plus_rouge_input": combined_score})
+    scores.update({"rouge1_input_feedback": score_feedback})
+
+    return scores
+    
 
 
 def custom_metric_scripting_func(pred: str, gold: str):
@@ -337,6 +386,8 @@ metric_map = {
     "custom": custom_metric_scripting_func,
     "rouge1": rouge1_metric,
     "rouge_combined": rouge_combined,
+    "rouge_combined_diff": rouge_combined_diff,
+    "rouge_combined_plus_rouge_input": rouge_combined_plus_rouge_input,
 }
 
 
