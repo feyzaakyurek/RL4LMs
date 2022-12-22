@@ -10,7 +10,7 @@ import json
 import os, re
 
 CALLS = 0
-GPT3_CACHE = {}
+# GPT3_CACHE = {}
 ATTEMPTS = 0
 HITS = 0
 
@@ -51,9 +51,8 @@ class EditMatchMetric(BaseMetric):
 
         # Load cache from cache_path.
         if os.path.exists(self.cache_path):
-            global GPT3_CACHE
             with open(self.cache_path, "r") as f:
-                GPT3_CACHE = json.load(f)
+                self.GPT3_CACHE = json.load(f)
 
 
     def compute(
@@ -66,7 +65,7 @@ class EditMatchMetric(BaseMetric):
         split_name: str = None,
         epoch: int = None,
     ):
-        global GPT3_CACHE, CALLS, ATTEMPTS, HITS
+        global CALLS, ATTEMPTS, HITS
 
         # Strip off task prefix
         inputs = [prompt.lstrip("Critique: ") for prompt in prompt_texts]
@@ -109,10 +108,15 @@ class EditMatchMetric(BaseMetric):
 
         if self.cache_path != "":
             
-            # If GPT3_CACHE is empty, load it from cache_path.
-            if len(GPT3_CACHE) == 0:
-                with open(self.cache_path, "r") as f:
-                    GPT3_CACHE = json.load(f)
+            try:
+                self.GPT3_CACHE
+            except:
+                # If GPT3_CACHE is empty, load it from cache_path.
+                if os.path.exists(self.cache_path):
+                    with open(self.cache_path, "r") as f:
+                        self.GPT3_CACHE = json.load(f)
+                else:
+                    self.GPT3_CACHE = {}
 
             # Check if we have cached results.
             # Cache queries.
@@ -126,9 +130,9 @@ class EditMatchMetric(BaseMetric):
             uncached_inputs = []
             for i, input in enumerate(cache_queries):
                 ATTEMPTS += 1
-                if input in GPT3_CACHE:
+                if input in self.GPT3_CACHE:
                     HITS += 1
-                    cached_results.append((i, GPT3_CACHE[input]))
+                    cached_results.append((i, self.GPT3_CACHE[input]))
                 else:
                     uncached_inputs.append((i, input_wfeed[i]))
             input_wfeed = [x[1] for x in uncached_inputs]
@@ -150,13 +154,13 @@ class EditMatchMetric(BaseMetric):
         if self.cache_path != "":
             # Update cache.
             uncached_queries = [cache_queries[i] for i, _ in uncached_inputs]
-            GPT3_CACHE.update(dict(zip(uncached_queries, edit_pred)))
+            self.GPT3_CACHE.update(dict(zip(uncached_queries, edit_pred)))
 
             if CALLS % 1 == 0:
-                print("Size: ", len(GPT3_CACHE), "Attempts: ", ATTEMPTS, "Hits: ", HITS, "Ratio: ", HITS / ATTEMPTS)
+                print("Size: ", len(self.GPT3_CACHE), "Attempts: ", ATTEMPTS, "Hits: ", HITS, "Ratio: ", HITS / ATTEMPTS)
                 print("Saving cache to", self.cache_path)
                 with open(self.cache_path, "w") as f:
-                    json.dump(GPT3_CACHE, f)
+                    json.dump(self.GPT3_CACHE, f)
             CALLS += 1
 
             edit_pred = iter(edit_pred)
@@ -216,8 +220,6 @@ class EditMatch(RewardFunction):
         done: bool,
         meta_info: Dict[str, Any] = None,
     ) -> float:
-
-        global calls
 
         if done:
             # 1. goal, steps, EOS, feedback_pred = Decode current_observation.input_encoded_pt
