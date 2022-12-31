@@ -16,13 +16,13 @@ class PrioritySampler:
         self.items = deque(maxlen=self.max_size)
         self.item_priorities = deque(maxlen=self.max_size)
         self.priority_scale = priority_scale
+        np.random.seed(0)
 
     def add(self, item: Any, priority: float):
         self.items.append(item)
         self.item_priorities.append(priority)
 
     def sample(self, size: int) -> List[Any]:
-        np.random.seed(0)
         min_sample_size = min(len(self.items), size)
         scaled_item_priorities = np.array(self.item_priorities) ** self.priority_scale
         sample_probs = scaled_item_priorities / np.sum(scaled_item_priorities)
